@@ -4,13 +4,26 @@ import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { FiCheck, FiChevronDown, FiSearch, FiX } from "react-icons/fi";
-import { COMPARE_MAX_SLOTS, useCompareStore, useMetaStore } from "@/stores";
+import {
+  COMPARE_MAX_SLOTS,
+  useCompareStore,
+  useMetaStore,
+  type VaultRiskFilter,
+} from "@/stores";
+import type { VaultRisk } from "@/types";
 import {
   formatApy,
   formatTvl,
   RISK_CLASS,
   RISK_LABEL,
 } from "@/components/pages/(app)/earn/vault-list/vault-list-utils";
+import {
+  APY_PRESETS,
+  MinThresholdDropdown,
+  ProtocolFilterDropdown,
+  type ProtocolOption,
+  RiskFilterChips,
+} from "@/components/pages/(app)/earn/vault-list";
 
 type ChainOption = {
   id: number;
@@ -34,11 +47,73 @@ export function VaultPickerSheet() {
   const chainsById = useMetaStore((s) => s.chainsById);
   const [chainOpen, setChainOpen] = useState(false);
 
+  const [apyMin, setApyMin] = useState<number | null>(null);
+  const [riskFilter, setRiskFilter] = useState<VaultRiskFilter>("all");
+  const [protocolFilter, setProtocolFilter] = useState<string | null>(null);
+
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => searchVaults(), 350);
     return () => clearTimeout(t);
   }, [open, searchQuery, searchVaults]);
+
+  useEffect(() => {
+    if (!open) {
+      setApyMin(null);
+      setRiskFilter("all");
+      setProtocolFilter(null);
+    }
+  }, [open]);
+
+  const filteredResults = useMemo(() => {
+    return searchResults.filter((vault) => {
+      if (apyMin !== null && vault.apy < apyMin) return false;
+      if (riskFilter !== "all" && vault.risk !== riskFilter) return false;
+      if (protocolFilter && vault.protocolKey !== protocolFilter) return false;
+      return true;
+    });
+  }, [searchResults, apyMin, riskFilter, protocolFilter]);
+
+  const protocolOptions = useMemo<ProtocolOption[]>(() => {
+    const map = new Map<string, ProtocolOption>();
+    for (const vault of searchResults) {
+      const existing = map.get(vault.protocolKey);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(vault.protocolKey, {
+          key: vault.protocolKey,
+          label: vault.protocol,
+          logo: vault.protocolLogoUri,
+          count: 1,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+  }, [searchResults]);
+
+  const activeProtocolOption = useMemo(
+    () =>
+      protocolFilter
+        ? protocolOptions.find((option) => option.key === protocolFilter) ??
+          null
+        : null,
+    [protocolFilter, protocolOptions],
+  );
+
+  const riskCounts = useMemo(
+    () =>
+      searchResults.reduce(
+        (acc, vault) => {
+          acc[vault.risk] = (acc[vault.risk] ?? 0) + 1;
+          return acc;
+        },
+        { low: 0, medium: 0, high: 0 } as Record<VaultRisk, number>,
+      ),
+    [searchResults],
+  );
 
   const chainOptions: ChainOption[] = useMemo(() => {
     const list = Object.values(chainsById).map((c) => ({
@@ -194,6 +269,29 @@ export function VaultPickerSheet() {
                 ) : null}
               </label>
 
+              <div className="flex flex-wrap items-center gap-2">
+                <MinThresholdDropdown
+                  label="APY"
+                  kind="apy"
+                  presets={APY_PRESETS}
+                  placeholder="e.g. 7.5"
+                  active={apyMin}
+                  onSelect={setApyMin}
+                />
+                <ProtocolFilterDropdown
+                  active={activeProtocolOption}
+                  options={protocolOptions}
+                  onSelect={setProtocolFilter}
+                />
+                <div className="ml-auto">
+                  <RiskFilterChips
+                    active={riskFilter}
+                    counts={riskCounts}
+                    onSelect={setRiskFilter}
+                  />
+                </div>
+              </div>
+
               {slotsFull ? (
                 <p className="rounded-xl bg-brand-soft px-3 py-2 text-[11px] text-brand">
                   Comparison full ({COMPARE_MAX_SLOTS} max). Remove one to add
@@ -209,13 +307,13 @@ export function VaultPickerSheet() {
                 <p className="rounded-2xl bg-surface-raised px-4 py-6 text-center text-xs text-muted">
                   Couldn't reach LI.FI Earn. Try again in a moment.
                 </p>
-              ) : searchResults.length === 0 ? (
+              ) : filteredResults.length === 0 ? (
                 <p className="rounded-2xl bg-surface-raised px-4 py-6 text-center text-xs text-muted">
                   No vaults found for this filter.
                 </p>
               ) : (
                 <ul className="flex flex-col gap-2">
-                  {searchResults.map((vault) => {
+                  {filteredResults.map((vault) => {
                     const alreadyAdded = selectedIds.has(vault.id);
                     const disabled = alreadyAdded || slotsFull;
                     const chainLogo = chainsById[vault.chainId]?.logoURI;

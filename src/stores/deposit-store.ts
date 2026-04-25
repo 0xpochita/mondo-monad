@@ -42,6 +42,27 @@ type DepositState = {
 
 let quoteController: AbortController | null = null;
 
+function friendlyQuoteError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes("no available quotes") ||
+    lower.includes("no_possible_route") ||
+    lower.includes("no_quote")
+  ) {
+    return "No route available for this vault right now. Try a different amount, token, or vault.";
+  }
+  if (lower.includes("insufficient")) {
+    return "Insufficient balance or liquidity to complete this deposit.";
+  }
+  if (lower.includes("slippage")) {
+    return "Route exceeds slippage tolerance. Try a smaller amount.";
+  }
+  if (lower.includes("upstream_error") || lower.startsWith("{")) {
+    return "We couldn't fetch a route. Please try again in a moment.";
+  }
+  return raw.length > 160 ? `${raw.slice(0, 160)}…` : raw;
+}
+
 function resolveFromToken(
   chainId: number,
   symbol: string,
@@ -153,7 +174,7 @@ export const useDepositStore = create<DepositState>((set, get) => ({
       const message = (error as Error).message || "Failed to fetch quote";
       set({
         step: "error",
-        error: message.length > 240 ? `${message.slice(0, 240)}…` : message,
+        error: friendlyQuoteError(message),
       });
     }
   },

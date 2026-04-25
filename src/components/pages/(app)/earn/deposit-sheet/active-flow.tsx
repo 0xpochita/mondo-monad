@@ -370,15 +370,40 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
           </p>
         </div>
         {txHash ? (
-          <a
-            href={`https://scan.li.fi/tx/${txHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-(--color-positive) transition-opacity hover:opacity-80"
-          >
-            View on LI.FI Scan
-            <FiExternalLink className="h-3 w-3" />
-          </a>
+          <div className="flex flex-col items-center gap-2">
+            <a
+              href={`https://scan.li.fi/tx/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-(--color-positive) transition-opacity hover:opacity-80"
+            >
+              <Image
+                src="/Assets/Images/Logo-Brand/logo_lifi_light.svg"
+                alt="LI.FI"
+                width={12}
+                height={12}
+                className="h-3 w-3 invert"
+              />
+              View on LI.FI Scan
+              <FiExternalLink className="h-3 w-3" />
+            </a>
+            <a
+              href={`https://monad.socialscan.io/tx/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted transition-colors hover:text-main"
+            >
+              <Image
+                src="/Assets/Images/Logo-Coin/monad-logo.jpg"
+                alt="Monad"
+                width={12}
+                height={12}
+                className="h-3 w-3 rounded-full object-contain"
+              />
+              View on Monad Scan
+              <FiExternalLink className="h-3 w-3" />
+            </a>
+          </div>
         ) : null}
         <button
           type="button"

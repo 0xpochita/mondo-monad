@@ -53,11 +53,22 @@ export async function GET(request: NextRequest) {
     const text = await upstreamResponse.text();
 
     if (!upstreamResponse.ok) {
+      let message = text;
+      let code: string | number | undefined;
+      try {
+        const parsed = JSON.parse(text) as {
+          message?: string;
+          code?: string | number;
+        };
+        if (typeof parsed.message === "string") message = parsed.message;
+        if (parsed.code !== undefined) code = parsed.code;
+      } catch {}
       return NextResponse.json(
         {
           error: "upstream_error",
           status: upstreamResponse.status,
-          message: text,
+          code,
+          message,
         },
         { status: upstreamResponse.status },
       );

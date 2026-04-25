@@ -28,7 +28,7 @@ export function TokensSection({
           </h2>
           <p className="text-xs text-muted">
             {isLoading
-              ? "Scanning balances across all networks…"
+              ? "Scanning balances on Monad…"
               : `${holdings.length} token${holdings.length === 1 ? "" : "s"} tracked`}
           </p>
         </div>

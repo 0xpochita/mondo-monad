@@ -65,7 +65,7 @@ export function TotalSummary({
             <span className="text-4xl font-semibold tracking-tight text-main">
               {formatUsd(totalValueUsd)}
             </span>
-            <span className="text-xs text-muted">across all networks</span>
+            <span className="text-xs text-muted">on Monad</span>
           </motion.div>
         )}
 
