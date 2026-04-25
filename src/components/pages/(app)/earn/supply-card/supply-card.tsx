@@ -2,8 +2,13 @@
 
 import { FiChevronDown } from "react-icons/fi";
 import { useEffect, useMemo, useState } from "react";
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount, useBalance, useReadContract } from "wagmi";
 import { erc20Abi, formatUnits } from "viem";
+
+const NATIVE_TOKEN_ADDRESSES = new Set([
+  "0x0000000000000000000000000000000000000000",
+  "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+]);
 import { mockChains } from "@/data";
 import { useWalletReady } from "@/lib/wallet-ready";
 import { useExpertStore, useMetaStore } from "@/stores";
@@ -262,15 +267,27 @@ function TokenBalanceInner({
   const { address, isConnected } = useAccount();
   const tokensBySymbol = useMetaStore((state) => state.tokensBySymbol);
   const tokenMeta = tokensBySymbol[chainId]?.[tokenSymbol.toUpperCase()];
+  const isNative = tokenMeta
+    ? NATIVE_TOKEN_ADDRESSES.has(tokenMeta.address.toLowerCase())
+    : false;
 
-  const { data: balanceData } = useReadContract({
+  const { data: erc20Balance } = useReadContract({
     address: tokenMeta?.address as `0x${string}` | undefined,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     chainId,
     query: {
-      enabled: isConnected && !!address && !!tokenMeta?.address,
+      enabled: isConnected && !!address && !!tokenMeta?.address && !isNative,
+      refetchInterval: 15_000,
+    },
+  });
+
+  const { data: nativeBalance } = useBalance({
+    address,
+    chainId,
+    query: {
+      enabled: isConnected && !!address && isNative,
       refetchInterval: 15_000,
     },
   });
@@ -279,13 +296,18 @@ function TokenBalanceInner({
     return <span className="text-muted">Balance 0.00 {tokenSymbol}</span>;
   }
 
-  const raw = balanceData as bigint | undefined;
+  const raw = isNative
+    ? nativeBalance?.value
+    : (erc20Balance as bigint | undefined);
   if (raw === undefined) {
     return <span className="text-muted">Balance — {tokenSymbol}</span>;
   }
 
-  const amount = Number(formatUnits(raw, tokenMeta.decimals));
-  const fullAmount = formatUnits(raw, tokenMeta.decimals);
+  const decimals = isNative
+    ? (nativeBalance?.decimals ?? tokenMeta.decimals)
+    : tokenMeta.decimals;
+  const amount = Number(formatUnits(raw, decimals));
+  const fullAmount = formatUnits(raw, decimals);
   const display =
     amount < 0.0001 && amount > 0
       ? "< 0.0001"
