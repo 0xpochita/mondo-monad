@@ -3,6 +3,23 @@ export const NATIVE_TOKEN_ADDRESSES = new Set([
   "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
 ]);
 
+export const WRAPPED_NATIVE_ABI = [
+  {
+    name: "deposit",
+    type: "function",
+    stateMutability: "payable",
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: "withdraw",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "amount", type: "uint256" }],
+    outputs: [],
+  },
+] as const;
+
 export const ERC20_ABI = [
   {
     name: "allowance",

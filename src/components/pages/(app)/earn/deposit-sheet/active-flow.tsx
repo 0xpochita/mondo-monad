@@ -25,10 +25,15 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { useDepositStore, useMetaStore, usePortfolioStore } from "@/stores";
+import {
+  ERC4626_DIRECT_DEPOSIT_TOOL,
+  ERC4626_WRAP_AND_DEPOSIT_TOOL,
+} from "@/stores/deposit-store";
 import { addTrackedVault } from "@/lib/tracked-vaults";
 import {
   ERC20_ABI,
   NATIVE_TOKEN_ADDRESSES,
+  WRAPPED_NATIVE_ABI,
   formatDuration,
   formatUsdString,
   trimAmountDisplay,
@@ -140,17 +145,61 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
 
       const lowerFromToken = fromTokenAddress.toLowerCase();
       const isNative = NATIVE_TOKEN_ADDRESSES.has(lowerFromToken);
+      const isWrapAndDeposit =
+        quote.tool === ERC4626_WRAP_AND_DEPOSIT_TOOL;
+      const isDirectDeposit = quote.tool === ERC4626_DIRECT_DEPOSIT_TOOL;
+      const amountNeeded = BigInt(quote.action.fromAmount);
+      const wrappedAddress = vault.tokenAddress as `0x${string}`;
       const approvalAddress = (quote.estimate.approvalAddress ??
         quote.transactionRequest.to) as `0x${string}`;
 
-      if (!isNative && approvalAddress) {
+      if (isWrapAndDeposit) {
         setStep("approving");
-        const amountNeeded = BigInt(quote.action.fromAmount);
+        const wrapHash = await writeContract(wagmiConfig, {
+          address: wrappedAddress,
+          abi: WRAPPED_NATIVE_ABI,
+          functionName: "deposit",
+          chainId: chain.id,
+          value: amountNeeded,
+        });
+        await waitForTransactionReceipt(wagmiConfig, {
+          hash: wrapHash,
+          chainId: chain.id,
+        });
+
+        const currentAllowance = (await readContract(wagmiConfig, {
+          address: wrappedAddress,
+          abi: ERC20_ABI,
+          functionName: "allowance",
+          args: [walletAddress, quote.transactionRequest.to as `0x${string}`],
+          chainId: chain.id,
+        })) as bigint;
+        if (currentAllowance < amountNeeded) {
+          const approveHash = await writeContract(wagmiConfig, {
+            address: wrappedAddress,
+            abi: ERC20_ABI,
+            functionName: "approve",
+            args: [
+              quote.transactionRequest.to as `0x${string}`,
+              amountNeeded,
+            ],
+            chainId: chain.id,
+          });
+          await waitForTransactionReceipt(wagmiConfig, {
+            hash: approveHash,
+            chainId: chain.id,
+          });
+        }
+      } else if (!isNative && approvalAddress) {
+        setStep("approving");
+        const allowanceTarget = (isDirectDeposit
+          ? (quote.transactionRequest.to as `0x${string}`)
+          : approvalAddress) as `0x${string}`;
         const currentAllowance = (await readContract(wagmiConfig, {
           address: lowerFromToken as `0x${string}`,
           abi: ERC20_ABI,
           functionName: "allowance",
-          args: [walletAddress, approvalAddress],
+          args: [walletAddress, allowanceTarget],
           chainId: chain.id,
         })) as bigint;
 
@@ -159,7 +208,7 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
             address: lowerFromToken as `0x${string}`,
             abi: ERC20_ABI,
             functionName: "approve",
-            args: [approvalAddress, amountNeeded],
+            args: [allowanceTarget, amountNeeded],
             chainId: chain.id,
           });
           await waitForTransactionReceipt(wagmiConfig, {
@@ -170,12 +219,16 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
       }
 
       setStep("depositing");
+      const sendValue =
+        isWrapAndDeposit || isDirectDeposit
+          ? undefined
+          : quote.transactionRequest.value
+            ? BigInt(quote.transactionRequest.value)
+            : undefined;
       const hash = await sendTransactionAsync({
         to: quote.transactionRequest.to as `0x${string}`,
         data: quote.transactionRequest.data as `0x${string}`,
-        value: quote.transactionRequest.value
-          ? BigInt(quote.transactionRequest.value)
-          : undefined,
+        value: sendValue,
         chainId: chain.id,
       });
       setTxHash(hash);
@@ -246,7 +299,7 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && hasAmount && !insufficientBalance) {
-                  fetchQuote(walletAddress);
+                  fetchQuote(walletAddress, wagmiConfig);
                 }
               }}
               className="w-full bg-transparent text-[28px] font-medium leading-none tracking-tight text-main outline-none placeholder:text-faint"
@@ -291,7 +344,7 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
         <button
           type="button"
           disabled={!hasAmount || insufficientBalance}
-          onClick={() => fetchQuote(walletAddress)}
+          onClick={() => fetchQuote(walletAddress, wagmiConfig)}
           className="flex w-full items-center justify-center rounded-2xl bg-brand px-5 py-4 text-base font-semibold text-white transition-colors cursor-pointer hover-brand active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {!hasAmount
@@ -330,7 +383,7 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
         <p className="mx-auto max-w-xs text-xs text-muted">{error}</p>
         <button
           type="button"
-          onClick={() => fetchQuote(walletAddress)}
+          onClick={() => fetchQuote(walletAddress, wagmiConfig)}
           className="mt-2 cursor-pointer rounded-full bg-brand px-4 py-2 text-xs font-semibold text-white transition-colors hover-brand"
         >
           Try again
