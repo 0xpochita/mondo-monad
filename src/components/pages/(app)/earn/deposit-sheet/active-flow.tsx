@@ -15,10 +15,12 @@ import {
 import { HiOutlineArrowsRightLeft } from "react-icons/hi2";
 import { motion } from "motion/react";
 import Image from "next/image";
-import { formatUnits } from "viem";
+import { erc20Abi, formatUnits, parseUnits } from "viem";
 import {
+  useBalance,
   useChainId,
   useConfig,
+  useReadContract,
   useSendTransaction,
   useSwitchChain,
 } from "wagmi";
@@ -62,10 +64,69 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
   const hasAmount = amount.trim() !== "" && Number.parseFloat(amount) > 0;
 
   const isCrossChain = chain.id !== vault.chainId;
-  const tokenLogo =
-    tokensBySymbol[chain.id]?.[token.symbol.toUpperCase()]?.logoURI;
+  const tokenMeta = tokensBySymbol[chain.id]?.[token.symbol.toUpperCase()];
+  const tokenLogo = tokenMeta?.logoURI;
   const fromChainLogo = chainsById[chain.id]?.logoURI;
   const toChainLogo = chainsById[vault.chainId]?.logoURI;
+
+  const isNativeToken = tokenMeta
+    ? NATIVE_TOKEN_ADDRESSES.has(tokenMeta.address.toLowerCase())
+    : false;
+  const tokenDecimals = tokenMeta?.decimals ?? 18;
+
+  const { data: erc20BalanceData } = useReadContract({
+    address: tokenMeta?.address as `0x${string}` | undefined,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: [walletAddress],
+    chainId: chain.id,
+    query: {
+      enabled: !!tokenMeta?.address && !isNativeToken,
+      refetchInterval: 15_000,
+    },
+  });
+  const { data: nativeBalanceData } = useBalance({
+    address: walletAddress,
+    chainId: chain.id,
+    query: {
+      enabled: isNativeToken,
+      refetchInterval: 15_000,
+    },
+  });
+
+  const balanceWei = isNativeToken
+    ? nativeBalanceData?.value
+    : (erc20BalanceData as bigint | undefined);
+  const balanceDecimals = isNativeToken
+    ? (nativeBalanceData?.decimals ?? tokenDecimals)
+    : tokenDecimals;
+  const balanceFormatted =
+    balanceWei !== undefined ? formatUnits(balanceWei, balanceDecimals) : null;
+  const balanceNumber =
+    balanceFormatted !== null ? Number(balanceFormatted) : null;
+  const balanceDisplay =
+    balanceNumber === null
+      ? "—"
+      : balanceNumber < 0.0001 && balanceNumber > 0
+        ? "< 0.0001"
+        : balanceNumber.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 4,
+          });
+
+  let amountWei: bigint | null = null;
+  if (hasAmount) {
+    try {
+      amountWei = parseUnits(amount, balanceDecimals);
+    } catch {
+      amountWei = null;
+    }
+  }
+  const insufficientBalance =
+    hasAmount &&
+    amountWei !== null &&
+    balanceWei !== undefined &&
+    amountWei > balanceWei;
 
   async function handleConfirm() {
     if (!quote || !fromTokenAddress) return;
@@ -183,25 +244,60 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
                 if (v === "" || /^\d*\.?\d*$/.test(v)) setAmount(v);
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && hasAmount) {
+                if (e.key === "Enter" && hasAmount && !insufficientBalance) {
                   fetchQuote(walletAddress);
                 }
               }}
               className="w-full bg-transparent text-[28px] font-medium leading-none tracking-tight text-main outline-none placeholder:text-faint"
               autoFocus
             />
-            <span className="shrink-0 text-sm font-semibold text-muted">
+            <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-muted">
+              {tokenLogo ? (
+                <Image
+                  src={tokenLogo}
+                  alt={token.symbol}
+                  width={20}
+                  height={20}
+                  className="h-5 w-5 rounded-full object-contain"
+                  unoptimized
+                />
+              ) : null}
               {token.symbol}
+            </span>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px]">
+            <span
+              className={
+                insufficientBalance ? "text-(--color-negative)" : "text-muted"
+              }
+            >
+              {insufficientBalance ? "Insufficient balance" : "\u00A0"}
+            </span>
+            <span className="flex items-center gap-1.5 text-muted">
+              Balance {balanceDisplay} {token.symbol}
+              {balanceFormatted && balanceNumber && balanceNumber > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setAmount(balanceFormatted)}
+                  className="rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-white/90 cursor-pointer transition-colors hover:bg-brand hover:text-white"
+                >
+                  MAX
+                </button>
+              ) : null}
             </span>
           </div>
         </div>
         <button
           type="button"
-          disabled={!hasAmount}
+          disabled={!hasAmount || insufficientBalance}
           onClick={() => fetchQuote(walletAddress)}
           className="flex w-full items-center justify-center rounded-2xl bg-brand px-5 py-4 text-base font-semibold text-white transition-colors cursor-pointer hover-brand active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {hasAmount ? `Supply ${amount} ${token.symbol}` : "Enter an amount"}
+          {!hasAmount
+            ? "Enter an amount"
+            : insufficientBalance
+              ? "Insufficient balance"
+              : `Supply ${amount} ${token.symbol}`}
         </button>
       </div>
     );
