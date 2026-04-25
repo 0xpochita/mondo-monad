@@ -187,6 +187,7 @@ export function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) 
         protocolName: vault.protocolKey,
         tokenSymbol: vault.tokenSymbol,
         tokenDecimals: vault.tokenDecimals,
+        tokenAddress: vault.tokenAddress,
         vaultName: vault.vaultName,
       });
 

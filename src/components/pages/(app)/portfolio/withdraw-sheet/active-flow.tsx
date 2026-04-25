@@ -24,6 +24,7 @@ import {
 } from "@/components/pages/(app)/earn/deposit-sheet/deposit-sheet-utils";
 import { resolveProtocol } from "@/lib/protocol-registry";
 import { useMetaStore, useWithdrawStore } from "@/stores";
+import { ERC4626_REDEEM_TOOL } from "@/stores/withdraw-store";
 import {
   ConnectPrompt,
   ErrorState,
@@ -71,7 +72,7 @@ function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) {
 
   useEffect(() => {
     if (step === "idle" && !quote) {
-      fetchQuote(walletAddress);
+      fetchQuote(walletAddress, wagmiConfig);
     }
   }, [step, quote, fetchQuote, walletAddress]);
 
@@ -118,10 +119,11 @@ function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) {
 
       const fromTokenAddress = position.asset.address.toLowerCase();
       const isNative = NATIVE_TOKEN_ADDRESSES.has(fromTokenAddress);
+      const skipApproval = quote.tool === ERC4626_REDEEM_TOOL;
       const approvalAddress = (quote.estimate.approvalAddress ??
         quote.transactionRequest.to) as `0x${string}`;
 
-      if (!isNative && approvalAddress) {
+      if (!isNative && approvalAddress && !skipApproval) {
         setStep("approving");
         const amountNeeded = BigInt(quote.action.fromAmount);
         const currentAllowance = (await readContract(wagmiConfig, {
@@ -185,7 +187,7 @@ function ActiveFlow({ walletAddress }: { walletAddress: `0x${string}` }) {
     return (
       <ErrorState
         error={error}
-        onRetry={() => fetchQuote(walletAddress)}
+        onRetry={() => fetchQuote(walletAddress, wagmiConfig)}
         onClose={closeSheet}
       />
     );

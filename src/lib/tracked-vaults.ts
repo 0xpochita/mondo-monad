@@ -7,6 +7,7 @@ const KNOWN_VAULTS: Omit<TrackedVault, "depositedAt">[] = [
     protocolName: "yo-protocol",
     tokenSymbol: "USDC",
     tokenDecimals: 6,
+    tokenAddress: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
     vaultName: "yoVaultUSD",
   },
 ];
@@ -17,6 +18,7 @@ export type TrackedVault = {
   protocolName: string;
   tokenSymbol: string;
   tokenDecimals: number;
+  tokenAddress?: string;
   vaultName: string;
   depositedAt: number;
 };
