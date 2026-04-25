@@ -120,20 +120,6 @@ Monad is the **default and primary** network. All other chains are supported for
 | # | Chain | Chain ID | Role | Status |
 |---|-------|----------|------|--------|
 | 1 | **Monad** | **143** | **Primary (default)** | Live |
-| 2 | Base | 8453 | Cross-chain | Live |
-| 3 | Ethereum | 1 | Cross-chain | Live |
-| 4 | Arbitrum | 42161 | Cross-chain | Live |
-| 5 | Polygon | 137 | Cross-chain | Live |
-| 6 | Katana | 747474 | Cross-chain | Live |
-| 7 | BSC | 56 | Cross-chain | Live |
-| 8 | Optimism | 10 | Cross-chain | Live |
-| 9 | Avalanche | 43114 | Cross-chain | Live |
-| 10 | Linea | 59144 | Cross-chain | Live |
-| 11 | Gnosis | 100 | Cross-chain | Live |
-| 12 | Unichain | 130 | Cross-chain | Live |
-| 13 | Mantle | 5000 | Cross-chain | Live |
-| 14 | Sonic | 146 | Cross-chain | Live |
-| 15 | Celo | 42220 | Cross-chain | Live |
 
 ---
 

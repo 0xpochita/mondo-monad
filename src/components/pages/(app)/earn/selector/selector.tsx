@@ -16,6 +16,7 @@ export function Selector({
   variant = "pill",
   emptyLabel,
   loading = false,
+  locked = false,
 }: SelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -62,11 +63,18 @@ export function Selector({
       <motion.button
         type="button"
         aria-label={label}
-        disabled={options.length === 0 || loading}
-        onClick={() => setOpen((prev) => !prev)}
-        className={`${triggerClass} disabled:cursor-not-allowed`}
-        whileHover={options.length > 0 && !loading ? { scale: 1.03 } : undefined}
-        whileTap={options.length > 0 && !loading ? { scale: 0.96 } : undefined}
+        disabled={options.length === 0 || loading || locked}
+        onClick={() => {
+          if (locked) return;
+          setOpen((prev) => !prev);
+        }}
+        className={`${triggerClass} ${locked ? "cursor-default" : "disabled:cursor-not-allowed"}`}
+        whileHover={
+          options.length > 0 && !loading && !locked ? { scale: 1.03 } : undefined
+        }
+        whileTap={
+          options.length > 0 && !loading && !locked ? { scale: 0.96 } : undefined
+        }
         transition={{ type: "spring", stiffness: 500, damping: 30 }}
       >
         {loading && !active ? (
@@ -107,17 +115,19 @@ export function Selector({
         ) : (
           <span className="tracking-tight text-muted">{emptyLabel ?? "—"}</span>
         )}
-        <motion.span
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={{ type: "spring", stiffness: 400, damping: 26 }}
-          className="flex"
-        >
-          <FiChevronDown className="h-4 w-4 text-muted" />
-        </motion.span>
+        {locked ? null : (
+          <motion.span
+            animate={{ rotate: open ? 180 : 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 26 }}
+            className="flex"
+          >
+            <FiChevronDown className="h-4 w-4 text-muted" />
+          </motion.span>
+        )}
       </motion.button>
 
       <AnimatePresence>
-        {open ? (
+        {open && !locked ? (
           <motion.div
             key="dropdown"
             initial={{ opacity: 0, y: -6, scale: 0.96 }}

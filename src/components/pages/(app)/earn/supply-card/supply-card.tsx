@@ -137,6 +137,7 @@ export function SupplyCard() {
           options={chainOptions}
           onSelect={handleChainSelect}
           variant="pill"
+          locked
         />
       </div>
 

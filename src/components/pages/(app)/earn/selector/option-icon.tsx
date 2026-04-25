@@ -18,6 +18,7 @@ export type SelectorProps = {
   variant?: "chip" | "pill";
   emptyLabel?: string;
   loading?: boolean;
+  locked?: boolean;
 };
 
 export function OptionIcon({
